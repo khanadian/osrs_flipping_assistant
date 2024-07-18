@@ -19,7 +19,7 @@ response = requests.get(url, headers=headers)
 r2 = requests.get(url2, headers=headers)
 
 df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "limit", \
-                           "potential", "cost", "1h volume"])
+                           "potential", "cost", "1h volume", "avg Low diff"])
 
 if r2.ok:
     items = json.loads(r2.content)
@@ -37,7 +37,7 @@ if response.ok:
                 low = int(data[key][k]["low"])
                 profit = high - low - tax - 2 #subtract 2 to play margins
                 
-                df.loc[int(k)] = [inv_items[int(k)], low, high, profit, 0, 0, 0, 0]
+                df.loc[int(k)] = [inv_items[int(k)], low, high, profit, 0, 0, 0, 0, "N/A"]
 
                 
 r3 = requests.get(url3, headers=headers)
@@ -64,6 +64,9 @@ if r4.ok:
             hivolume = output[data][key]['highPriceVolume']
             lovolume = output[data][key]['lowPriceVolume']
             df.at[int(key), "1h volume"] = hivolume + lovolume
+            avgLow = output[data][key]['avgLowPrice']
+            if avgLow:
+                df.at[int(key), "avg Low diff"] = df.at[int(key), "low"] - avgLow
 
 
 print(df)
