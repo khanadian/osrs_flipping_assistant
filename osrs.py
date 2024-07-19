@@ -37,7 +37,7 @@ if response.ok:
                 low = int(data[key][k]["low"])
                 profit = high - low - tax - 2 #subtract 2 to play margins
                 
-                df.loc[int(k)] = [inv_items[int(k)], low, high, profit, 0, 0, 0, 0, "N/A"]
+                df.loc[int(k)] = [inv_items[int(k)], low, high, profit, 1, 0, 0, 0, "N/A"]
 
                 
 r3 = requests.get(url3, headers=headers)
@@ -63,6 +63,7 @@ if r4.ok:
         for key in output[data]:
             hivolume = output[data][key]['highPriceVolume']
             lovolume = output[data][key]['lowPriceVolume']
+            ratio = round((hivolume + lovolume)/df.at[int(key), "limit"], 4)
             df.at[int(key), "1h volume"] = hivolume + lovolume
             avgLow = output[data][key]['avgLowPrice']
             if avgLow:
