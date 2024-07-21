@@ -9,6 +9,7 @@ url = "https://prices.runescape.wiki/api/v1/osrs/latest"
 url2 = "https://oldschool.runescape.wiki/?title=Module:GEIDs/data.json&action=raw&ctype=application%2Fjson"
 url3 = "https://prices.runescape.wiki/api/v1/osrs/mapping"
 url4 = "https://prices.runescape.wiki/api/v1/osrs/1h"
+url5 = "https://prices.runescape.wiki/api/v1/osrs/timeseries"
 
 headers = {
     'User-Agent': 'flip finder',
@@ -18,7 +19,7 @@ headers = {
 response = requests.get(url, headers=headers)
 r2 = requests.get(url2, headers=headers)
 
-df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "limit", \
+df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "ROI", "limit", \
                            "potential", "cost", "1h volume", "avg Low diff"])
 
 if r2.ok:
@@ -36,8 +37,10 @@ if response.ok:
                 tax = int(math.floor(high * 0.01))
                 low = int(data[key][k]["low"])
                 profit = high - low - tax - 2 #subtract 2 to play margins
+                roi = round(profit / high, 3)
                 
-                df.loc[int(k)] = [inv_items[int(k)], low, high, profit, 1, 0, 0, 0, "N/A"]
+                df.loc[int(k)] = [inv_items[int(k)], low, high, profit, roi, 1, \
+                                  0, 0, 0, "N/A"]
 
                 
 r3 = requests.get(url3, headers=headers)
@@ -64,7 +67,7 @@ if r4.ok:
             hivolume = output[data][key]['highPriceVolume']
             lovolume = output[data][key]['lowPriceVolume']
             ratio = round((hivolume + lovolume)/df.at[int(key), "limit"], 4)
-            df.at[int(key), "1h volume"] = hivolume + lovolume
+            df.at[int(key), "1h volume"] = ratio
             avgLow = output[data][key]['avgLowPrice']
             if avgLow:
                 df.at[int(key), "avg Low diff"] = df.at[int(key), "low"] - avgLow
@@ -72,3 +75,12 @@ if r4.ok:
 
 print(df)
 df.to_csv('out.csv', index=False)
+
+r5 = requests.get(url5, headers=headers)
+
+if r5.ok:
+    ts = json.loads(r4.content)
+    for key in ts:
+        print(key)
+        print(ts[key])
+    
