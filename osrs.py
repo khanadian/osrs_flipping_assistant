@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import math
 import gspread
-
+import statistics
 
 url = "https://prices.runescape.wiki/api/v1/osrs/latest"
 url2 = "https://oldschool.runescape.wiki/?title=Module:GEIDs/data.json&action=raw&ctype=application%2Fjson"
@@ -24,8 +24,8 @@ r2 = requests.get(url2, headers=headers)
 
 df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "ROI", "limit", \
                            "potential", "cost", "5m volume", "1h volume",\
-                           "24h volume", "avg low diff", "avg high diff", \
-                           "diff % change", 'miss'])
+                           "24h volume", "volume avg", "avg low diff", \
+                           "avg high diff", 'miss'])
 df_avg = pd.DataFrame(columns=['item', 'timestamp', 'low', 'high', 'lovolume',\
                                'hivolume'])
                                
@@ -45,7 +45,7 @@ if response.ok:
                 low = int(data[key][k]["low"])
                 
                 df.loc[int(k)] = [inv_items[int(k)], low, high, 0, 0, 1, \
-                                  0, 0, 0, 0, 0, "N/A", "N/A", 0, 0]
+                                  0, 0, 0, 0, 0, 0, "N/A", "N/A", 0]
 else:
     print("r fail")
 
@@ -60,13 +60,14 @@ if r4.ok:
                 hivolume = output[data][key]['highPriceVolume']
                 lovolume = output[data][key]['lowPriceVolume']                  
                 #ratio = round(math.log((hivolume * lovolume)/(df.at[int(key), "limit"]**2), 4)
-                df.at[int(key), "5m volume"] = round(math.log(hivolume*lovolume + 1), 2)
+                df.at[int(key), "5m volume"] = hivolume+lovolume
             except:
-                print(key)
+                continue
+                #print(key)
 else:
     print("r4 fail")
     
-for i in range(1, 18):
+for i in range(1, 6):
     timestamp = str(round((int(time.time())-(300*i))/300)*300) #must be nearest 300)
     url4a = url4 + "?timestamp="+timestamp
     r4 = requests.get(url4a, headers=headers)
@@ -79,7 +80,9 @@ for i in range(1, 18):
                 try:
                     hivolume = output[data][key]['highPriceVolume']
                     lovolume = output[data][key]['lowPriceVolume']
-                    if hivolume == 0 or lovolume == 0:
+                    if hivolume == 0:
+                        df.at[int(key), "miss"] += 1
+                    if lovolume == 0:
                         df.at[int(key), "miss"] += 1
                     hiprice = output[data][key]['avgHighPrice']
                     loprice = output[data][key]['avgLowPrice']
@@ -97,8 +100,15 @@ df_avg.to_csv('out2.csv', index=False)
 
 for ind in df.index:
     temp_df = df_avg[df_avg.index.str.startswith(str(ind)+"-")]
-    low = temp_df["low"].quantile(0.4, interpolation='higher')
-    high = temp_df["high"].quantile(0.6, interpolation='lower')
+    low = list(filter(lambda item: item is not None, temp_df["low"]))
+    high = list(filter(lambda item: item is not None, temp_df["high"]))
+    try:
+        low = statistics.median(low)
+        high = statistics.median(high)
+    except Exception as e:
+        low = 2
+        high = 1
+    
     try:
         tax = int(math.floor(high * 0.01))
     except:
@@ -106,11 +116,13 @@ for ind in df.index:
     profit = high - low - tax
     #print(high, low, tax, profit)
     df.at[ind, "profit"] = profit
-    df.at[ind, "ROI"] = round(profit / high, 3)
+    df.at[ind, "ROI"] = round(profit / high * 100, 3)
     df.at[ind, "avg low diff"] =df.at[ind, "low"] - low 
     df.at[ind, "avg high diff"] =df.at[ind, "high"] - high
-    df.at[ind, "diff % change"] = round((df.at[ind, "avg high diff"] \
-                - df.at[ind, "avg low diff"])/(2*high), 3)
+    #df.at[ind, "diff % change"] = round((df.at[ind, "avg high diff"] \
+    #            - df.at[ind, "avg low diff"])/(2*high), 3)
+
+    df.at[ind, "miss"] += (5-len(temp_df.index))
                 
 r3 = requests.get(url3, headers=headers)
 
@@ -145,7 +157,7 @@ if r5.ok:
             hvolume = output[data][key]['highPriceVolume']
             lvolume = output[data][key]['lowPriceVolume']
             if avgLow and avgHigh:
-                df.at[int(key), "1h volume"] = round(math.log(hvolume+1) * math.log(lvolume+1), 2)
+                df.at[int(key), "1h volume"] = round((hvolume+lvolume)/df.at[int(key), "limit"], 3)
 else:
     print("r5 fail")
 
@@ -162,7 +174,13 @@ if r6.ok:
             hvolume = output[data][key]['highPriceVolume']
             lvolume = output[data][key]['lowPriceVolume']
             if avgLow and avgHigh:
-                df.at[int(key), "24h volume"] = round(math.log(hvolume+1) * math.log(lvolume+1), 2)
+                df.at[int(key), "5m volume"] = round(df.at[int(key), "5m volume"]/df.at[int(key), "limit"]\
+                                               *12, 3)
+                df.at[int(key), "24h volume"] = round((hvolume+lvolume)/df.at[int(key), "limit"]/24, 3)
+                df.at[int(key), "volume avg"] = (df.at[int(key), "5m volume"] + \
+                                                df.at[int(key), "1h volume"] + \
+                                                df.at[int(key), "24h volume"])/3
+                
 else:
     print("r6 fail")
 
