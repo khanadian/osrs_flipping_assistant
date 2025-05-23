@@ -7,20 +7,22 @@ import math
 import gspread
 import statistics
 
-url = "https://prices.runescape.wiki/api/v1/osrs/latest"
-url2 = "https://oldschool.runescape.wiki/?title=Module:GEIDs/data.json&action=raw&ctype=application%2Fjson"
-url3 = "https://prices.runescape.wiki/api/v1/osrs/mapping"
-url4 = "https://prices.runescape.wiki/api/v1/osrs/5m"
-url5 = "https://prices.runescape.wiki/api/v1/osrs/1h"
-url6 = "https://prices.runescape.wiki/api/v1/osrs/24h"
+URL = "https://prices.runescape.wiki/api/v1/osrs/latest"
+URL_ID = "https://oldschool.runescape.wiki/?title=Module:GEIDs/data.json&action=raw&ctype=application%2Fjson"
+URL_INFO = "https://prices.runescape.wiki/api/v1/osrs/mapping"
+URL_5m = "https://prices.runescape.wiki/api/v1/osrs/5m"
+URL_1h = "https://prices.runescape.wiki/api/v1/osrs/1h"
+URL_24h = "https://prices.runescape.wiki/api/v1/osrs/24h"
+
 
 headers = {
     'User-Agent': 'flip finder',
     'From': 'khanadian'
     }
 
-response = requests.get(url, headers=headers)
-r2 = requests.get(url2, headers=headers)
+#getting the info on all of the items and populating the dataframe
+response = requests.get(URL, headers=headers)
+r2 = requests.get(URL_ID, headers=headers)
 
 df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "ROI", "limit", \
                            "potential", "cost", "5m volume", "1h volume",\
@@ -48,7 +50,8 @@ if response.ok:
 else:
     print("r fail")
 
-r4 = requests.get(url4, headers=headers)
+#grabbing the 5-minute info
+r4 = requests.get(URL_5m, headers=headers)
 if r4.ok:
     output = json.loads(r4.content)
     for data in output:
@@ -65,11 +68,12 @@ if r4.ok:
 else:
     print("r4 fail")
 
+#calculating the averaged low, high, and misses
 attempts = 18
 for i in range(1, attempts):
     timestamp = str(round((int(time.time())-(300*i))/300)*300) #must be nearest 300)
-    url4a = url4 + "?timestamp="+timestamp
-    r4 = requests.get(url4a, headers=headers)
+    URL_5ma = URL_5m + "?timestamp="+timestamp
+    r4 = requests.get(URL_5ma, headers=headers)
     if r4.ok:
         output = json.loads(r4.content)
         for data in output:
@@ -91,12 +95,13 @@ for i in range(1, attempts):
                 except:
                     print(key)
     else:
-        print(url4a)
+        print(URL_5ma)
     time.sleep(1)
 
-print(df_avg)
-df_avg.to_csv('out2.csv', index=False)
+#print(df_avg)
+#df_avg.to_csv('out2.csv', index=False)
 
+#calculating the profit, return on investment, and total misses with taxes factored in
 for ind in df.index:
     temp_df = df_avg[df_avg.index.str.startswith(str(ind)+"-")]
     low = list(filter(lambda item: item is not None, temp_df["low"]))
@@ -116,8 +121,9 @@ for ind in df.index:
     df.at[ind, "profit"] = profit
     df.at[ind, "ROI"] = round(profit / high * 100, 3)
     df.at[ind, "miss"] += (attempts-len(temp_df.index))
-                
-r3 = requests.get(url3, headers=headers)
+
+#calculating the potential and cost based on the limit             
+r3 = requests.get(URL_INFO, headers=headers)
 
 if r3.ok:
     mapping = json.loads(r3.content)
@@ -136,8 +142,9 @@ if r3.ok:
             print(item["name"])
 else:
     print("r3 fail")
-                
-r5 = requests.get(url5, headers=headers)
+
+#adding data for 1-hour
+r5 = requests.get(URL_1h, headers=headers)
 
 if r5.ok:
     output = json.loads(r5.content)
@@ -157,7 +164,8 @@ if r5.ok:
 else:
     print("r5 fail")
 
-r6 = requests.get(url6, headers=headers)
+#adding data for 24 hours, normalizing the 5 minute and 24 hour data with the 1-hour data for easier comparability
+r6 = requests.get(URL_24h, headers=headers)
 
 if r6.ok:
     output = json.loads(r6.content)
@@ -185,10 +193,12 @@ if r6.ok:
 else:
     print("r6 fail")
 
+#calculating score
 numerator = df["potential"] * df["volume avg"] * abs((abs(df["ROI"]+1)**0.5) - 1.4)
 denominator = ((1+df["miss"])*(1+df["volume diff"]))**2
 df["score"] = round(numerator/denominator, 3)
 
+#outputting
 print(df)
 df.to_csv('out.csv', index=False)
 
