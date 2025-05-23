@@ -24,8 +24,7 @@ r2 = requests.get(url2, headers=headers)
 
 df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "ROI", "limit", \
                            "potential", "cost", "5m volume", "1h volume",\
-                           "24h volume", "volume avg", "avg low diff", \
-                           "avg high diff", 'miss'])
+                           "24h volume", "volume avg", "miss", "volume diff", "score"])
 df_avg = pd.DataFrame(columns=['item', 'timestamp', 'low', 'high', 'lovolume',\
                                'hivolume'])
                                
@@ -45,7 +44,7 @@ if response.ok:
                 low = int(data[key][k]["low"])
                 
                 df.loc[int(k)] = [inv_items[int(k)], low, high, 0, 0, 1, \
-                                  0, 0, 0, 0, 0, 0, "N/A", "N/A", 0]
+                                  0, 0, 0, 0, 0, 0, 0, 0, 0]
 else:
     print("r fail")
 
@@ -59,15 +58,15 @@ if r4.ok:
             try:
                 hivolume = output[data][key]['highPriceVolume']
                 lovolume = output[data][key]['lowPriceVolume']                  
-                #ratio = round(math.log((hivolume * lovolume)/(df.at[int(key), "limit"]**2), 4)
                 df.at[int(key), "5m volume"] = hivolume+lovolume
             except:
                 continue
                 #print(key)
 else:
     print("r4 fail")
-    
-for i in range(1, 6):
+
+attempts = 18
+for i in range(1, attempts):
     timestamp = str(round((int(time.time())-(300*i))/300)*300) #must be nearest 300)
     url4a = url4 + "?timestamp="+timestamp
     r4 = requests.get(url4a, headers=headers)
@@ -114,15 +113,9 @@ for ind in df.index:
     except:
         tax = int(math.floor(df.at[ind, "high"] * 0.01))
     profit = high - low - tax
-    #print(high, low, tax, profit)
     df.at[ind, "profit"] = profit
     df.at[ind, "ROI"] = round(profit / high * 100, 3)
-    df.at[ind, "avg low diff"] =df.at[ind, "low"] - low 
-    df.at[ind, "avg high diff"] =df.at[ind, "high"] - high
-    #df.at[ind, "diff % change"] = round((df.at[ind, "avg high diff"] \
-    #            - df.at[ind, "avg low diff"])/(2*high), 3)
-
-    df.at[ind, "miss"] += (5-len(temp_df.index))
+    df.at[ind, "miss"] += (attempts-len(temp_df.index))
                 
 r3 = requests.get(url3, headers=headers)
 
@@ -136,8 +129,8 @@ if r3.ok:
             lim = 1
 
         try:
-            df.at[item["id"], "potential"] = lim * df.at[item["id"], "profit"]
-            df.at[item["id"], "cost"] = lim * df.at[item["id"], "low"]
+            df.at[item["id"], "potential"] = round(lim * df.at[item["id"], "profit"]/1000, 2)
+            df.at[item["id"], "cost"] = round(lim * df.at[item["id"], "low"]/1000000, 2)
             df.at[item["id"], "limit"] = lim
         except:
             print(item["name"])
@@ -157,7 +150,10 @@ if r5.ok:
             hvolume = output[data][key]['highPriceVolume']
             lvolume = output[data][key]['lowPriceVolume']
             if avgLow and avgHigh:
-                df.at[int(key), "1h volume"] = round((hvolume+lvolume)/df.at[int(key), "limit"], 3)
+                try:
+                    df.at[int(key), "1h volume"] = round((hvolume+lvolume)/df.at[int(key), "limit"], 3)
+                except:
+                    continue #only an issue for newly released content and items
 else:
     print("r5 fail")
 
@@ -177,12 +173,21 @@ if r6.ok:
                 df.at[int(key), "5m volume"] = round(df.at[int(key), "5m volume"]/df.at[int(key), "limit"]\
                                                *12, 3)
                 df.at[int(key), "24h volume"] = round((hvolume+lvolume)/df.at[int(key), "limit"]/24, 3)
-                df.at[int(key), "volume avg"] = (df.at[int(key), "5m volume"] + \
-                                                df.at[int(key), "1h volume"] + \
-                                                df.at[int(key), "24h volume"])/3
+                df.at[int(key), "volume avg"] = round(statistics.median([df.at[int(key), "5m volume"],
+                            df.at[int(key), "1h volume"],  df.at[int(key), "24h volume"]]), 3)
+
+                volumediff = hvolume/lvolume
+                if volumediff < 1:
+                    volumediff = 1/volumediff
+
+                df.at[int(key), "volume diff"] = round(volumediff, 3)
                 
 else:
     print("r6 fail")
+
+numerator = df["potential"] * df["volume avg"] * abs((abs(df["ROI"]+1)**0.5) - 1.4)
+denominator = ((1+df["miss"])*(1+df["volume diff"]))**2
+df["score"] = round(numerator/denominator, 3)
 
 print(df)
 df.to_csv('out.csv', index=False)
