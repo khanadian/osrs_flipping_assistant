@@ -24,7 +24,7 @@ headers = {
 response = requests.get(URL, headers=headers)
 r2 = requests.get(URL_ID, headers=headers)
 
-df = pd.DataFrame(columns=['item', 'low', 'high', 'profit', "ROI", "limit", \
+df = pd.DataFrame(columns=["ID", 'item', 'low', 'high', 'profit', "ROI", "limit", \
                            "potential", "cost", "5m volume", "1h volume",\
                            "24h volume", "volume avg", "miss", "volume diff", "score"])
 df_avg = pd.DataFrame(columns=['item', 'timestamp', 'low', 'high', 'lovolume',\
@@ -45,7 +45,7 @@ if response.ok:
                 high = int(data[key][k]["high"])
                 low = int(data[key][k]["low"])
                 
-                df.loc[int(k)] = [inv_items[int(k)], low, high, 0, 0, 1, \
+                df.loc[int(k)] = [k, inv_items[int(k)], low, high, 0, 0, 1, \
                                   0, 0, 0, 0, 0, 0, 0, 0, 0]
 else:
     print("r fail")
