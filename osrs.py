@@ -114,9 +114,12 @@ for ind in df.index:
         high = 1
     
     try:
-        tax = int(math.floor(high * 0.01))
+        tax = int(math.floor(high * 0.02))
     except:
-        tax = int(math.floor(df.at[ind, "high"] * 0.01))
+        tax = int(math.floor(df.at[ind, "high"] * 0.02))
+    if tax > 5000000: #the tax is capped
+        tax = 5000000
+
     profit = high - low - tax
     df.at[ind, "profit"] = profit
     df.at[ind, "ROI"] = round(profit / high * 100, 3)
