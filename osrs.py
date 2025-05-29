@@ -26,7 +26,7 @@ r2 = requests.get(URL_ID, headers=headers)
 
 df = pd.DataFrame(columns=["ID", 'item', 'low', 'high', 'profit', "ROI", "limit", \
                            "potential", "cost", "5m volume", "1h volume",\
-                           "24h volume", "volume avg", "miss", "volume diff", "score"])
+                           "24h volume", "volume avg", "miss", "volume diff", "members", "score"])
 df_avg = pd.DataFrame(columns=['item', 'timestamp', 'low', 'high', 'lovolume',\
                                'hivolume'])
                                
@@ -46,7 +46,7 @@ if response.ok:
                 low = int(data[key][k]["low"])
                 
                 df.loc[int(k)] = [k, inv_items[int(k)], low, high, 0, 0, 1, \
-                                  0, 0, 0, 0, 0, 0, 0, 0, 0]
+                                  0, 0, 0, 0, 0, 0, 0, 0, True, 0]
 else:
     print("r fail")
 
@@ -130,17 +130,19 @@ r3 = requests.get(URL_INFO, headers=headers)
 
 if r3.ok:
     mapping = json.loads(r3.content)
-    mpp = {}
     for item in mapping:
         try:
+            mems = item["members"]
             lim = item["limit"]
         except:
             lim = 1
+            mems = True
 
         try:
             df.at[item["id"], "potential"] = round(lim * df.at[item["id"], "profit"]/1000, 2)
             df.at[item["id"], "cost"] = round(lim * df.at[item["id"], "low"]/1000000, 2)
             df.at[item["id"], "limit"] = lim
+            df.at[item["id"], "members"] = mems
         except:
             print(item["name"])
 else:
